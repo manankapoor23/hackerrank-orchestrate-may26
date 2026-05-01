@@ -5,16 +5,16 @@ Step 2: confidence check
 Step 3: LLM fallback ONLY if confidence < threshold
 """
 
-import anthropic
+from openai import OpenAI
 from config import (
     DOMAIN_KEYWORDS, ROUTER_CONFIDENCE_THRESHOLD,
-    ANTHROPIC_API_KEY, LLM_MODEL, LLM_TEMPERATURE,
+    OPENAI_API_KEY, LLM_MODEL, LLM_TEMPERATURE,
 )
 from utils.logger import log_agent, log_llm_call
 
 VALID_COMPANIES = {"claude", "hackerrank", "visa"}
 
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 
 def run(query: str, company: str | None) -> dict:
@@ -45,6 +45,11 @@ def run(query: str, company: str | None) -> dict:
         log_agent("router", f"rule-keyword → {best_domain}", {"scores": scores})
         return {"domain": best_domain, "method": "keyword", "confidence": best_score}
 
+    # FIX: If company is None and no keyword match, escalate to unknown without LLM fallback
+    if company is None and best_score == 0:
+        log_agent("router", "rule-no-match, company-None → unknown", {"scores": scores})
+        return {"domain": "unknown", "method": "no_match", "confidence": "none"}
+
     # Step 2 — LLM fallback
     domain = _llm_classify(query)
     return {"domain": domain, "method": "llm_fallback", "confidence": "llm"}
@@ -58,13 +63,13 @@ def _llm_classify(query: str) -> str:
         f"Ticket:\n{query}"
     )
     try:
-        resp = client.messages.create(
+        resp = client.chat.completions.create(
             model=LLM_MODEL,
             max_tokens=10,
             temperature=LLM_TEMPERATURE,
             messages=[{"role": "user", "content": prompt}],
         )
-        label = resp.content[0].text.strip().lower()
+        label = resp.choices[0].message.content.strip().lower()
         log_llm_call(prompt, label, {"domain": label})
         if label in VALID_COMPANIES:
             return label

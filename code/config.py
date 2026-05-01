@@ -1,10 +1,19 @@
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env file
+env_path = Path(__file__).parent / ".env"
+load_dotenv(env_path)
 
 # ── API ────────────────────────────────────────────────────────────────────
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-LLM_MODEL         = "claude-sonnet-4-20250514"
+OPENAI_API_KEY    = os.environ.get("OPENAI_API_KEY", "")
+LLM_MODEL         = "gpt-4o"
 LLM_TEMPERATURE   = 0
 LLM_MAX_TOKENS    = 1024
+
+# OpenRouter configuration
+OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "")
 
 # ── Paths ──────────────────────────────────────────────────────────────────
 DATA_DIR      = os.path.join(os.path.dirname(__file__), "..", "data")
@@ -22,7 +31,7 @@ CHUNK_OVERLAP       = 50
 
 TOP_K               = 3       
 
-RETRIEVAL_THRESHOLD = 0.35     # base threshold
+RETRIEVAL_THRESHOLD = 0.40     # base threshold (escalate below this)
 LOW_CONF_THRESHOLD  = 0.25     # for fallback trigger
 MIN_SCORE           = 0.15     # filter weak chunks
 
@@ -41,6 +50,7 @@ DOMAIN_KEYWORDS = {
         "interview", "proctoring", "plagiarism", "submission", "hire",
         "screen", "skill", "leaderboard", "contest", "challenge", "recruit",
         "engage", "chakra", "skillup", "library", "question", "score report",
+        "settings", "payment", "billing", "subscription", "plan", "credits",
     ],
     "claude": [
         "claude", "anthropic", "api", "prompt", "model", "token", "llm",
@@ -111,27 +121,71 @@ INJECTION_PATTERNS = [
 ]
 
 SENSITIVE_KEYWORDS = {
-    "visa": [
-        "fraud", "unauthorized transaction", "stolen card", "chargeback",
-        "dispute", "cvv", "card number", " pan ", "settlement dispute",
-        "data breach", "identity theft", "account takeover", "phishing",
-    ],
-    "claude": [
-        "account hacked", "unauthorized access", "data breach", "gdpr",
-        "right to erasure", "legal action", "lawsuit", "ip violation",
-        "sso failure", "scim", "jit provisioning", "account suspended",
-        "copyright", "defamation",
-    ],
-    "hackerrank": [
-        "cheating", "plagiarism", "unfair disqualification", "wrongly flagged",
-        "gdpr", "delete my data", "data erasure", "billing dispute",
-        "contract", "ats sync failure", "candidate data leak",
-        "wrongful termination", "discrimination",
-    ],
-}
+    "visa": {
+        "high_risk": [
+            "fraud", "fraudulent", "unauthorized", "unauthorised",
+            "stolen card", "lost card", "card stolen", "my card is stolen", "card was stolen",
+            "unauthorized transaction", "unknown transaction",
+            "someone used my card", "card hacked",
+            "identity theft", "id theft", "identity stolen", "identity has been stolen",
+            "my identity was stolen", "someone stole my identity", "account taken over",
+            "phishing", "scam",
+            "data breach", "account takeover",
+            "chargeback", "dispute transaction",
+            "card details leaked", "cvv", "card number", "pan",
+        ],
+        "medium_risk": [
+            "billing issue", "double charge", "duplicate charge",
+            "refund not received",
+            "transaction failed", "incorrect charge",
+        ],
+        "high_risk": [
+            "unauthorized", "stolen", "hacked",
+            "dispute", "chargeback", "fraudulent",
+            "lost", "theft",
+        ],
+    },
 
+    "claude": {
+        "high_risk": [
+            "account hacked", "unauthorized access",
+            "data breach", "privacy violation",
+            "right to erasure", "delete my data permanently",
+            "security vulnerability", "vulnerability", "bug bounty",
+            "legal action", "lawsuit", "court case",
+            "ip violation", "copyright", "defamation",
+            "account suspended wrongly", "security issue",
+        ],
+        "medium_risk": [
+            "api not working", "model error", "rate limit",
+            "billing issue", "subscription issue",
+            "sso failure", "scim issue", "jit provisioning",
+            "login issue", "access issue",
+        ],
+    },
+
+    "hackerrank": {
+        "high_risk": [
+            "cheating", "plagiarism", "copied code",
+            "unfair disqualification", "wrongly flagged",
+            "data leak", "candidate data leak",
+            "delete my data", "data erasure",
+            "discrimination", "bias", "wrongful termination",
+            "legal complaint", "contract violation",
+            "infosec", "security questionnaire", "security form",
+            "vendor assessment", "compliance form", "soc 2", "iso 27001",
+            "enterprise procurement", "vendor form",
+            "security vulnerability", "vulnerability", "bug bounty",
+        ],
+        "medium_risk": [
+            "test not loading", "assessment issue",
+            "submission failed", "compiler error",
+            "question bug", "incorrect result",
+            "billing issue", "payment problem",
+            "ats sync failure", "integration issue",
+        ],
+    },
+}
 ESCALATION_RESPONSE = (
-    "Thank you for reaching out. Your issue requires attention from our "
-    "specialist support team. A human agent will review your case and "
-    "follow up with you shortly. Please do not re-submit this ticket."
+    "This ticket will be reviewed by our support team."
 )

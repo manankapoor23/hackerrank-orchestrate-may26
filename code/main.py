@@ -27,6 +27,7 @@ def parse_args():
     parser.add_argument("--sample", action="store_true",  help="Run on sample CSV")
     parser.add_argument("--ingest", action="store_true",  help="Re-ingest corpus into local embeddings store")
     parser.add_argument("--file",   type=str, default=None, help="Custom input CSV path")
+    parser.add_argument("--trial", action="store_true",  help="Run on trial_*.csv with trial_*.csv output")
     return parser.parse_args()
 
 
@@ -49,19 +50,39 @@ def main():
     df = pd.read_csv(input_path, dtype=str).fillna("")
     print(f"[main] Loaded {len(df)} tickets from {input_path}")
 
+    # Support both lowercase and capitalized CSV headers.
+    col_map = {str(col).strip().lower(): col for col in df.columns}
+    issue_col = col_map.get("issue", "issue")
+    subject_col = col_map.get("subject", "subject")
+    company_col = col_map.get("company", "company")
+
     results = []
     for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing tickets"):
         ticket = {
-            "issue":   row.get("issue", ""),
-            "subject": row.get("subject", ""),
-            "company": row.get("company", None),
+            "issue":   row.get(issue_col, ""),
+            "subject": row.get(subject_col, ""),
+            "company": row.get(company_col, None),
         }
         output = run_pipeline(ticket, ticket_id=idx)
         results.append(output)
 
-    out_df = df.copy()
-    for field in ["status", "product_area", "response", "justification", "request_type"]:
-        out_df[field] = [r[field] for r in results]
+    rows = []
+    for r in results:
+        rows.append({
+            "status": str(r.get("status", "escalated")).lower(),
+            "product_area": str(r.get("product_area", "unknown") or "unknown"),
+            "response": str(r.get("response", "") or ""),
+            "justification": str(r.get("justification", "") or ""),
+            "request_type": str(r.get("request_type", "product_issue") or "product_issue"),
+        })
+
+    out_df = pd.DataFrame(rows, columns=[
+        "status",
+        "product_area",
+        "response",
+        "justification",
+        "request_type",
+    ])
 
     os.makedirs(os.path.dirname(OUTPUT_CSV), exist_ok=True)
     out_df.to_csv(OUTPUT_CSV, index=False)
